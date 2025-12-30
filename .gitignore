@@ -1,0 +1,15 @@
+# Rust
+/target/
+/pkg/
+
+# Node.js
+www/node_modules/
+
+# WebAssembly
+*.wasmee
+
+# Webpack
+www/dist/
+
+# IDE
+.idea/
