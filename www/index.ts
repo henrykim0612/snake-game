@@ -1,9 +1,10 @@
 import __wbg_init, {World, Direction} from "snake-game";
+import {rnd} from "./utils/rnd";
 
 __wbg_init().then(wasm => {
   const CELL_SIZE = 20;
   const WORLD_WIDTH = 8;
-  const snakeSpawnIdx = Math.floor(Math.random() * (WORLD_WIDTH * WORLD_WIDTH));
+  const snakeSpawnIdx = rnd(WORLD_WIDTH * WORLD_WIDTH);
 
   const world = World.new(WORLD_WIDTH, snakeSpawnIdx);
   const worldWidth = world.width();
@@ -50,6 +51,22 @@ __wbg_init().then(wasm => {
     ctx.stroke();
   }
 
+  function drawReward() {
+    const idx = world.reward_cell();
+    const col = idx % worldWidth;
+    const row = Math.floor(idx / worldWidth);
+
+    ctx.beginPath();
+    ctx.fillStyle = "#FF0000";
+    ctx.fillRect(
+      col * CELL_SIZE,
+      row * CELL_SIZE,
+      CELL_SIZE,
+      CELL_SIZE
+    );
+    ctx.stroke();
+  }
+
   function drawSnake() {
     const snakeCells = new Uint32Array(
       wasm.memory.buffer,
@@ -61,7 +78,7 @@ __wbg_init().then(wasm => {
       const col = cellIdx % worldWidth;
       const row = Math.floor(cellIdx / worldWidth);
 
-      ctx.fillStyle = i === 0 ? "#7878db" : "#000000";
+      ctx.fillStyle = i === 0 ? "#0093ff" : "#000000";
 
       ctx.beginPath();
       ctx.fillRect(
@@ -77,6 +94,7 @@ __wbg_init().then(wasm => {
   function paint() {
     drawWorld();
     drawSnake();
+    drawReward();
   }
 
   function update() {
