@@ -17,6 +17,14 @@ pub enum Direction {
     Left,
 }
 
+#[wasm_bindgen]
+#[derive(Clone, Copy)]
+pub enum GameStatus {
+    Won,
+    Lost,
+    Played,
+}
+
 #[derive(Clone, Copy, PartialEq)]
 pub struct SnakeCell(usize);
 
@@ -46,7 +54,9 @@ pub struct World {
     size: usize,
     snake: Snake,
     next_cell: Option<SnakeCell>,
-    reward_cell: usize,
+    reward_cell: Option<usize>,
+    status: Option<GameStatus>,
+    points: usize,
 }
 
 #[wasm_bindgen]
@@ -61,10 +71,12 @@ impl World {
             reward_cell: World::gen_reward_cell(size, &snake.body),
             snake,
             next_cell: None,
+            status: None,
+            points: 0,
         }
     }
 
-    fn gen_reward_cell(max: usize, snake_body: &Vec<SnakeCell>) -> usize {
+    fn gen_reward_cell(max: usize, snake_body: &Vec<SnakeCell>) -> Option<usize> {
         let mut reward_cell;
 
         loop {
@@ -74,19 +86,39 @@ impl World {
             }
         }
 
-        reward_cell
+        Some(reward_cell)
     }
 
     pub fn width(&self) -> usize {
         self.width
     }
 
-    pub fn reward_cell(&self) -> usize {
+    pub fn points(&self) -> usize {
+        self.points
+    }
+
+    pub fn reward_cell(&self) -> Option<usize> {
         self.reward_cell
     }
 
     pub fn snake_head_idx(&self) -> usize {
         self.snake.body[0].0
+    }
+    pub fn start_game(&mut self) {
+        self.status = Some(GameStatus::Played);
+    }
+
+    pub fn game_status(&self) -> Option<GameStatus> {
+        self.status
+    }
+
+    pub fn game_status_text(&self) -> String {
+        match self.status {
+            Some(GameStatus::Won) => String::from("You have won!"),
+            Some(GameStatus::Lost) => String::from("You have lost!"),
+            Some(GameStatus::Played) => String::from("Playing"),
+            None => String::from("No Status"),
+        }
     }
 
     pub fn change_snake_dir(&mut self, direction: Direction) {
@@ -107,29 +139,40 @@ impl World {
     }
 
     pub fn step(&mut self) {
-        let temp = self.snake.body.clone();
+        match self.status {
+            Some(GameStatus::Played) => {
+                let temp = self.snake.body.clone();
 
-        match self.next_cell {
-            Some(cell) => {
-                self.snake.body[0] = cell;
-                self.next_cell = None;
+                match self.next_cell {
+                    Some(cell) => {
+                        self.snake.body[0] = cell;
+                        self.next_cell = None;
+                    }
+                    None => self.snake.body[0] = self.gen_next_snake_cell(&self.snake.direction),
+                }
+
+                for i in 1..self.snake_length() {
+                    self.snake.body[i] = SnakeCell(temp[i - 1].0);
+                }
+
+                // 뱀 몸통 충돌 시 패배
+                if self.snake.body[1..self.snake_length()].contains(&self.snake.body[0]) {
+                    self.status = Some(GameStatus::Lost)
+                }
+
+                if self.reward_cell == Some(self.snake_head_idx()) {
+                    if self.snake_length() < self.size {
+                        self.points += 1;
+                        self.reward_cell = World::gen_reward_cell(self.size, &self.snake.body);
+                    } else {
+                        self.reward_cell = None;
+                        self.status = Some(GameStatus::Won);
+                    }
+
+                    self.snake.body.push(SnakeCell(self.snake.body[1].0));
+                }
             }
-            None => self.snake.body[0] = self.gen_next_snake_cell(&self.snake.direction),
-        }
-
-        let len = self.snake.body.len();
-        for i in 1..len {
-            self.snake.body[i] = SnakeCell(temp[i - 1].0);
-        }
-
-        if self.reward_cell == self.snake_head_idx() {
-            if self.snake_length() < self.size {
-                self.reward_cell = World::gen_reward_cell(self.size, &self.snake.body);
-            } else {
-                self.reward_cell = 1000;
-            }
-
-            self.snake.body.push(SnakeCell(self.snake.body[1].0));
+            _ => {}
         }
     }
 

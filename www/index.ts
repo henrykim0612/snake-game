@@ -1,14 +1,17 @@
-import __wbg_init, {World, Direction} from "snake-game";
+import __wbg_init, {World, Direction, GameStatus} from "snake-game";
 import {rnd} from "./utils/rnd";
 
 __wbg_init().then(wasm => {
   const CELL_SIZE = 20;
-  const WORLD_WIDTH = 8;
+  const WORLD_WIDTH = 4;
   const snakeSpawnIdx = rnd(WORLD_WIDTH * WORLD_WIDTH);
 
   const world = World.new(WORLD_WIDTH, snakeSpawnIdx);
   const worldWidth = world.width();
 
+  const $points = document.getElementById("points");
+  const $gameStatus = document.getElementById("game-status");
+  const $gameControlBtn = document.getElementById("game-control-btn");
   const $canvas = document.getElementById("snake-canvas") as HTMLCanvasElement;
   const ctx = $canvas.getContext("2d");
 
@@ -17,6 +20,18 @@ __wbg_init().then(wasm => {
 
   const snakeCellPtr = world.snake_cells();
   const snakeLen = world.snake_length();
+
+  $gameControlBtn.addEventListener("click", _ => {
+    const status = world.game_status();
+
+    if (status === undefined) {
+      $gameControlBtn.textContent = "Playing..."
+      world.start_game();
+      play();
+    } else {
+      location.reload();
+    }
+  })
 
   document.addEventListener("keydown", e => {
     switch (e.code) {
@@ -74,40 +89,60 @@ __wbg_init().then(wasm => {
       world.snake_length()
     )
 
-    snakeCells.forEach((cellIdx, i) => {
-      const col = cellIdx % worldWidth;
-      const row = Math.floor(cellIdx / worldWidth);
+    snakeCells
+      .filter((cellIdx, i) => !(i > 0 && cellIdx === snakeCells[0])) // 충돌 시 머리 색깔 유지를 위한 필터
+      .forEach((cellIdx, i) => {
+        const col = cellIdx % worldWidth;
+        const row = Math.floor(cellIdx / worldWidth);
 
-      ctx.fillStyle = i === 0 ? "#0093ff" : "#000000";
+        // we are overriding snake head color by body when we crush
+        ctx.fillStyle = i === 0 ? "#0093ff" : "#000000";
 
-      ctx.beginPath();
-      ctx.fillRect(
-        col * CELL_SIZE,
-        row * CELL_SIZE,
-        CELL_SIZE,
-        CELL_SIZE
-      );
-    })
+        ctx.beginPath();
+        ctx.fillRect(
+          col * CELL_SIZE,
+          row * CELL_SIZE,
+          CELL_SIZE,
+          CELL_SIZE
+        );
+      })
     ctx.stroke();
+  }
+
+  function drawGameStatus() {
+    $gameStatus.textContent = world.game_status_text();
+    $points.textContent = world.points().toString();
+
+    const status = world.game_status();
+    if (status == GameStatus.Won || status == GameStatus.Lost) {
+      $gameControlBtn.textContent = "Re-Play";
+    }
   }
 
   function paint() {
     drawWorld();
     drawSnake();
     drawReward();
+    drawGameStatus();
   }
 
-  function update() {
-    const fps = 10;
+  function play() {
+    const status = world.game_status();
+
+    if (status == GameStatus.Won || status == GameStatus.Lost) {
+      $gameControlBtn.textContent = "Re-Play";
+      return;
+    }
+
+    const fps = 3;
     setTimeout(() => {
       ctx.clearRect(0, 0, $canvas.width, $canvas.height);
       world.step();
       paint();
       // the method takes a callback to invoked before the next repaint
-      requestAnimationFrame(update);
+      requestAnimationFrame(play);
     }, 1000 / fps);
   }
 
-  // paint();
-  update();
+  paint();
 });
